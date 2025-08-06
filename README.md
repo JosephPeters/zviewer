@@ -1,4 +1,4 @@
-# Zellij Session Viewer (ZView)
+# Zellij Session Viewer (ZViewer)
 
 A comprehensive web-based session management interface for zellij terminal multiplexer. This application provides a modern, intuitive interface to view, navigate, and manage your zellij sessions with embedded terminal access.
 
@@ -36,7 +36,6 @@ A comprehensive web-based session management interface for zellij terminal multi
 - **Node.js** (v14 or higher)
 - **Zellij** terminal multiplexer installed and accessible via command line
 - **npm** package manager
-- **Active zellij sessions** (create with `zellij` or `zellij --session <name>`)
 ### **Important Notes**
 
 - **Safari HTTPS Requirement**: Safari requires HTTPS for authentication to work properly in embedded sessions. Use [Cloudflare Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) for external access.
@@ -48,7 +47,7 @@ A comprehensive web-based session management interface for zellij terminal multi
 
 1. **Clone/Navigate to the project directory**:
    ```bash
-   cd zview
+   cd zviewer
    ```
 
 2. **Install dependencies**:
@@ -220,7 +219,7 @@ Single Domain: https://your-app.com
 ## 📁 Project Structure
 
 ```
-zview/
+zviewer/
 ├── README.md                    # Main documentation
 ├── .env.example                 # Environment variables template ⭐
 ├── DEPLOYMENT_OPTIONS.md        # Comprehensive deployment guide
@@ -436,31 +435,6 @@ The server logs detailed information about session parsing. Check the server ter
 
 ## 🔮 Future Enhancements
 
-### **Planned Features**
-1. **Advanced Session Management**
-   - Create new sessions with custom names and layouts
-   - Delete/kill sessions from the UI
-   - Rename existing sessions
-   - Session templates and quick-start options
-
-2. **Enhanced Monitoring**
-   - Real-time session activity indicators
-   - Resource usage monitoring (CPU, memory)
-   - Session health checks and alerts
-   - Connection status for each session
-
-3. **Productivity Features**
-   - Session grouping and organization
-   - Favorite sessions and quick access
-   - Session search and filtering
-   - Bulk operations on multiple sessions
-
-4. **Advanced Integration**
-   - WebSocket connection for real-time updates
-   - Plugin system for custom actions
-   - Export/import session configurations
-   - Integration with external tools and workflows
-
 ### **Technical Roadmap**
 
 #### **✅ Completed Implementation**
@@ -471,7 +445,6 @@ The server logs detailed information about session parsing. Check the server ter
 - **Auto-refresh**: Background updates every 30 seconds
 - **Error Handling**: Graceful degradation and error screens
 - **Mobile Support**: Responsive design with collapsible sidebar
-- **Keyboard Shortcuts**: Power-user navigation features
 
 #### **🔄 Current Architecture**
 ```javascript
@@ -501,41 +474,6 @@ UI Components:
         └── Iframe (zellij web client)
 ```
 
-#### **🎯 Next Development Priorities**
-
-1. **Session Creation Interface**
-   - Add form for creating new sessions with custom names
-   - Integrate with zellij session creation commands
-   - Template support for common session layouts
-
-2. **Advanced Session Control**
-   - Kill/terminate sessions from UI
-   - Session rename functionality
-   - Bulk operations on multiple sessions
-
-3. **Real-time Enhancements**
-   - WebSocket integration for live updates
-   - Session activity monitoring
-   - Connection status indicators
-
-4. **Developer Experience**
-   - TypeScript migration for better type safety
-   - Unit tests for components and API
-   - Docker containerization for easy deployment
-
-### **🔧 API Extensions (Planned)**
-
-**Current API:**
-- `GET /api/sessions` - List sessions with metadata
-- `GET /api/health` - Health check
-
-**Future Extensions:**
-- `POST /api/sessions` - Create new session
-- `DELETE /api/sessions/:name` - Kill session
-- `PUT /api/sessions/:name` - Rename session
-- `GET /api/sessions/:name/info` - Detailed session info
-- `WebSocket /api/ws` - Real-time session updates
-
 ## 🤝 Contributing
 
 ### **Development Setup**
@@ -552,18 +490,10 @@ UI Components:
 - **Architecture**: Component-based, centralized state management
 - **Testing**: Manual testing with real zellij sessions
 
-### **Adding New Features**
-1. **Backend**: Extend `server.js` with new API endpoints
-2. **Frontend**: Update `src/main.js` for logic, `src/style.css` for styling
-3. **Documentation**: Update README and implementation plan
-4. **Testing**: Verify with multiple session states and screen sizes
-
 ## 👨‍💻 Developer Resources
 
 ### **For AI Coders & Junior Developers**
 - **[Developer Guide](docs/DEVELOPER_GUIDE.md)** - Comprehensive guide to understanding and extending the codebase
-- **[Environment Variables Plan](ENVIRONMENT_VARIABLES_PLAN.md)** - Roadmap for configurable deployment
-- **[Deployment Options](DEPLOYMENT_OPTIONS.md)** - All deployment approaches and trade-offs
 
 ### **External Documentation**
 - **[Zellij Web Client Documentation](https://zellij.dev/documentation/web-client.html)** - Official zellij web client docs
@@ -575,9 +505,6 @@ UI Components:
 - **Vite**: For the fast development build tool
 - **Community**: For feedback and feature suggestions
 
-## 📄 License
-
-This project is part of a zellij session management toolkit. Open source under MIT license.
 
 ---
 
