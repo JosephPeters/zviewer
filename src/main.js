@@ -7,7 +7,7 @@ const SESSION_REFRESH_INTERVAL = parseInt(import.meta.env.VITE_SESSION_REFRESH_I
 
 // Application state
 let appState = {
-  sessions: [],
+  sessions: [], // Will store current session list for comparison
   selectedSession: null,
   loading: false,
   sidebarCollapsed: false,
@@ -96,9 +96,9 @@ function renderSidebar(sessionsData) {
       </div>
     </div>
     <div class="sidebar-footer">
-      <button id="new-session-btn" class="btn-secondary" title="Coming soon">+ New Session</button>
+      <button id="new-session-btn" class="btn-secondary" title="Create new session">+ New Session</button>
       <div class="keyboard-hints">
-        <small>↑↓ Navigate • ESC Clear • Ctrl+R Refresh</small>
+        <small>↑↓ Navigate • ESC Clear • Ctrl+R Refresh • Ctrl+N New</small>
       </div>
     </div>
   `;
@@ -126,6 +126,35 @@ function renderMainContent() {
         <p>Loading session: ${appState.selectedSession.name}</p>
       </div>
     `;
+    return;
+  }
+
+  // Handle new session creation
+  if (appState.selectedSession.isNew) {
+    mainContent.innerHTML = `
+      <div class="session-viewer">
+        <div class="session-header">
+          <h3>Create New Session</h3>
+          <p>Enter a session name in the zellij interface below. The new session will appear in the sidebar automatically.</p>
+          <small style="color: #888;">💡 Tip: Auto-refresh will detect your new session within ${SESSION_REFRESH_INTERVAL} seconds</small>
+        </div>
+        <iframe
+          id="session-iframe"
+          src="${ZELLIJ_WEB_URL}/"
+          frameborder="0"
+          title="Create New Zellij Session"
+          onload="this.style.opacity = '1'; handleNewSessionIframeLoad()">
+        </iframe>
+      </div>
+    `;
+
+    // Set initial iframe opacity for smooth loading
+    setTimeout(() => {
+      const iframe = document.querySelector('#session-iframe');
+      if (iframe) {
+        iframe.style.opacity = '0';
+      }
+    }, 100);
     return;
   }
 
@@ -184,15 +213,38 @@ async function loadSessions() {
     refreshButton.disabled = true;
   }
 
+  // Store previous sessions for new session detection
+  const previousSessions = [...appState.sessions];
+
   const sessionsData = await fetchSessions();
+
+  // Update app state with new sessions
+  if (sessionsData.success) {
+    appState.sessions = sessionsData.sessions;
+  }
+
   renderSidebar(sessionsData);
 
-  // If we had a selected session, try to keep it selected
-  if (appState.selectedSession) {
-    const stillExists = sessionsData.sessions?.find(s => s.name === appState.selectedSession.name);
-    if (!stillExists) {
-      appState.selectedSession = null;
-      renderMainContent();
+  // Handle session state based on current selection
+  if (appState.selectedSession && sessionsData.success) {
+    if (appState.selectedSession.isNew) {
+      // Option A: Preserve new session state during refresh
+      // Option B: Check if a new session was created
+      const newSession = detectNewSession(previousSessions, sessionsData.sessions);
+      if (newSession) {
+        // Auto-switch to the newly created session
+        console.log(`New session detected: ${newSession.name} - switching to it`);
+        appState.selectedSession = newSession;
+        renderMainContent();
+      }
+      // If no new session detected, keep the new session interface active
+    } else {
+      // Regular session validation - clear if session no longer exists
+      const stillExists = sessionsData.sessions.find(s => s.name === appState.selectedSession.name);
+      if (!stillExists) {
+        appState.selectedSession = null;
+        renderMainContent();
+      }
     }
   }
 
@@ -237,6 +289,11 @@ document.addEventListener('click', (e) => {
     loadSessions();
   }
 
+  // New session button
+  if (e.target.id === 'new-session-btn') {
+    createNewSession();
+  }
+
   // Sidebar toggle (for mobile)
   if (e.target.id === 'sidebar-toggle') {
     appState.sidebarCollapsed = !appState.sidebarCollapsed;
@@ -255,6 +312,12 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
     e.preventDefault();
     loadSessions();
+  }
+
+  // Ctrl/Cmd + N: New session
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+    e.preventDefault();
+    createNewSession();
   }
 
   // Escape: Deselect session
@@ -286,6 +349,33 @@ function navigateSessionsWithKeyboard(direction) {
   if (newSession) {
     selectSession(newSession.name);
   }
+}
+
+// Detect newly created sessions by comparing before/after
+function detectNewSession(previousSessions, currentSessions) {
+  // Find sessions that exist now but didn't exist before
+  const newSessions = currentSessions.filter(current =>
+    !previousSessions.find(prev => prev.name === current.name)
+  );
+
+  // Return the most recently created new session (first in list is usually newest)
+  return newSessions.length > 0 ? newSessions[0] : null;
+}
+
+// Create new session
+function createNewSession() {
+  // Set state to show we're creating a new session
+  appState.selectedSession = {
+    name: 'New Session',
+    isNew: true
+  };
+  renderMainContent();
+}
+
+// Handle new session iframe load
+function handleNewSessionIframeLoad() {
+  console.log('New session interface loaded - user can now create a session');
+  // Optional: Could add additional logic here like detecting when a session is created
 }
 
 // Auto-refresh functionality
