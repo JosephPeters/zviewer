@@ -223,11 +223,7 @@ function renderSidebarHeader(sessionsData) {
             ${icon('eye', 14)} ${hiddenCount}
           </button>
         ` : ''}
-        <button id="auto-hide-toggle" 
-                class="icon-btn ${appState.autoHideExited ? 'active' : ''}" 
-                title="Auto-hide exited sessions">
-          ${icon('settings', 14)}
-        </button>
+        
         <button id="refresh-btn" class="icon-btn" title="Refresh (Ctrl+R)">${icon('refreshCw', 14)}</button>
         <div class="auto-refresh-indicator ${appState.autoRefresh ? 'active' : ''}" title="Auto-refresh every 30s"></div>
       </div>
@@ -320,8 +316,7 @@ function renderMainContent() {
       <div class="session-viewer">
         <div class="session-header">
           <h3>Create New Session</h3>
-          <p>Enter a session name in the zellij interface below. The new session will appear in the sidebar automatically.</p>
-          <small style="color: #888;">💡 Tip: Auto-refresh will detect your new session within ${SESSION_REFRESH_INTERVAL} seconds</small>
+          
         </div>
         <iframe
           id="session-iframe"

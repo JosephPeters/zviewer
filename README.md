@@ -10,20 +10,20 @@ Clone it first
 
 then
 ```bash
-   npm install
+npm install
    ```
 then create zellij web token
    ```bash
-   zellij web --create-token
+zellij web --create-token
    ```
 
 then start zellij web
 ```bash
-   zellij web --port 8083
+zellij web --port 8083
    ```
 then start all dev servers
  ```bash
-   npm run dev-proxy
+npm run dev-proxy
    ```
 Navigate to `http://localhost:4000/zviewer/`
 
@@ -34,8 +34,12 @@ https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do
 
 after installing cloudflared then
 ```bash
-   cloudflared tunnel --url http://localhost:8080
+cloudflared tunnel --url http://localhost:8080
    ```
+
+### Tip:
+Zellij's Web Client is fairly new. Get familiar with it first, for the best understanding of the experience.
+https://zellij.dev/documentation/web-client.html 
 
 
 
