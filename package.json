@@ -1,0 +1,27 @@
+{
+  "name": "zview",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.js",
+    "proxy": "node proxy-server.js",
+    "dev-full": "concurrently \"npm run server\" \"npm run dev\"",
+    "dev-proxy": "concurrently \"npm run server\" \"npm run dev\" \"npm run proxy\"",
+    "start:zellij": "zellij web --port ${ZELLIJ_PORT:-8083}",
+    "start:all": "concurrently \"npm run start:zellij\" \"npm run dev-proxy\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "vite": "^7.0.4"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.5"
+  }
+}
