@@ -8,7 +8,8 @@ The Zellij Session Viewer is a web-based interface for managing and viewing zell
 1. **Lists zellij sessions** via backend API that executes `zellij list-sessions`
 2. **Displays session management UI** with sidebar navigation and status indicators
 3. **Embeds zellij web client** in iframes for direct terminal access
-4. **Provides same-origin authentication** through reverse proxy architecture
+4. **Creates new sessions** through embedded zellij interface with auto-detection
+5. **Provides same-origin authentication** through reverse proxy architecture
 
 ## 🏗️ **Architecture Deep Dive**
 
@@ -31,6 +32,8 @@ The Zellij Session Viewer is a web-based interface for managing and viewing zell
 4. **Backend parses** output and returns JSON
 5. **Frontend displays** session list with status indicators
 6. **User clicks session** → iframe loads `/session-name` (zellij web client)
+7. **User creates new session** → iframe loads `/` (zellij creation interface)
+8. **Auto-refresh detects** new session → automatically switches to it
 
 ## 📁 **Codebase Structure**
 
@@ -109,16 +112,20 @@ const sessions = stdout.trim().split('\n')
 **Key State**:
 ```javascript
 const appState = {
-  sessions: [],           // Session data from API
-  selectedSession: null,  // Currently viewed session
+  sessions: [],           // Session data from API for comparison
+  selectedSession: null,  // Currently viewed session (or {isNew: true} for creation)
   loading: false,        // Loading state
-  sidebarCollapsed: false // Mobile sidebar state
+  sidebarCollapsed: false, // Mobile sidebar state
+  autoRefresh: true,     // Auto-refresh toggle
+  refreshInterval: null  // Refresh timer ID
 };
 ```
 
 **Key Functions**:
 - `fetchSessions()` - API call to get session list
 - `selectSession(session)` - Load session in iframe
+- `createNewSession()` - Show new session creation interface
+- `detectNewSession()` - Compare session lists to find newly created sessions
 - `renderSessions()` - Update UI with session data
 - `setupEventListeners()` - Keyboard shortcuts and clicks
 
@@ -349,9 +356,12 @@ npm run start:all  # Uses environment variables automatically
 ### **Testing Checklist**
 - [ ] Session list loads correctly
 - [ ] Session selection works (iframe loads)
+- [ ] **New session creation works** (button and Ctrl+N)
+- [ ] **New session interface stays stable during auto-refresh**
+- [ ] **Auto-detection switches to newly created sessions**
 - [ ] Authentication persists in embedded sessions
-- [ ] Keyboard shortcuts work (arrows, enter, escape)
-- [ ] Auto-refresh updates session list
+- [ ] Keyboard shortcuts work (arrows, enter, escape, Ctrl+N)
+- [ ] Auto-refresh updates session list (configurable interval)
 - [ ] Mobile responsive design works
 - [ ] Error handling for offline sessions
 
@@ -377,6 +387,16 @@ npm run start:all  # Uses environment variables automatically
 **Debug**: Test `zellij list-sessions --no-formatting` manually
 **Fix**: Ensure zellij is installed and sessions exist
 
+### **5. New Session Creation Issues**
+**Cause**: Auto-refresh kicking out of new session interface
+**Debug**: Check console for "New session detected" messages
+**Fix**: Ensure `detectNewSession()` logic and `isNew` state preservation
+
+### **6. New Session Not Auto-Switching**
+**Cause**: Session comparison logic not detecting new sessions
+**Debug**: Check `appState.sessions` array and comparison logic
+**Fix**: Verify session name matching and array initialization
+
 ## 🔧 **Adding New Features**
 
 ### **Backend API Extension**
@@ -385,10 +405,27 @@ npm run start:all  # Uses environment variables automatically
 3. Update proxy if needed (usually automatic)
 
 ### **Frontend Feature Addition**
-1. Add UI elements in `renderSessions()` or create new render function
-2. Add event handlers in `setupEventListeners()`
+1. Add UI elements in `renderSidebar()` or `renderMainContent()`
+2. Add event handlers in the main click event listener
 3. Update state management in `appState`
-4. Add CSS styling in `src/style.css`
+4. Consider session state preservation during auto-refresh
+5. Add CSS styling in `src/style.css`
+
+**Example: New Session Creation Pattern**
+```javascript
+// 1. Add button/UI element
+<button id="new-feature-btn">New Feature</button>
+
+// 2. Add click handler
+if (e.target.id === 'new-feature-btn') {
+  handleNewFeature();
+}
+
+// 3. Handle state during refresh
+if (appState.selectedSession?.isSpecialState) {
+  // Preserve special state during auto-refresh
+}
+```
 
 ### **Proxy Configuration**
 1. Add new route in `proxy-server.js`
@@ -400,8 +437,10 @@ npm run start:all  # Uses environment variables automatically
 
 ### **Current Optimizations**
 - **On-demand iframe loading**: Sessions load only when selected
-- **Efficient polling**: 30-second auto-refresh interval
+- **Configurable polling**: Auto-refresh interval via environment variables
 - **Minimal API calls**: Only session list, not individual session data
+- **Smart session detection**: Efficient comparison for new session detection
+- **State preservation**: Avoids unnecessary re-renders during refresh
 - **Responsive design**: Mobile-optimized with collapsible sidebar
 
 ### **Potential Improvements**
@@ -414,9 +453,10 @@ npm run start:all  # Uses environment variables automatically
 
 ### **Immediate Opportunities**
 1. ~~**Environment Variables**: Implement the plan in `ENVIRONMENT_VARIABLES_PLAN.md`~~ ✅ **COMPLETED**
-2. **Session Creation**: Add UI for creating new sessions
+2. ~~**Session Creation**: Add UI for creating new sessions~~ ✅ **COMPLETED**
 3. **Session Management**: Delete/rename sessions from UI
-4. **Error Handling**: Better error states and recovery
+4. **Enhanced New Session UX**: Session templates, naming validation, creation feedback
+5. **Error Handling**: Better error states and recovery
 
 ### **Advanced Features**
 1. **Real-time Updates**: WebSocket connection for live session changes
@@ -429,9 +469,12 @@ npm run start:all  # Uses environment variables automatically
 ### **Manual Testing**
 1. **Multiple Sessions**: Create 3-5 zellij sessions for testing
 2. **Session States**: Test active, exited, and new sessions
-3. **Network Conditions**: Test with slow/offline backend
-4. **Browser Testing**: Chrome, Firefox, Safari (note HTTPS requirement)
-5. **Mobile Testing**: Responsive design on various screen sizes
+3. **New Session Flow**: Test creation, auto-detection, and switching
+4. **Auto-refresh Stability**: Verify no kick-out during session creation
+5. **Keyboard Shortcuts**: Test Ctrl+N, Ctrl+R, arrows, escape
+6. **Network Conditions**: Test with slow/offline backend
+7. **Browser Testing**: Chrome, Firefox, Safari (note HTTPS requirement)
+8. **Mobile Testing**: Responsive design on various screen sizes
 
 ### **Automated Testing (Future)**
 - Unit tests for session parsing logic
@@ -465,9 +508,11 @@ npm run start:all  # Uses environment variables automatically
 
 1. **Use proxy logs**: They show exactly how requests are routed
 2. **Test with real sessions**: Create actual zellij sessions for realistic testing
-3. **Check browser console**: Frontend errors and network requests
-4. **Monitor all terminals**: Backend, frontend, and proxy logs
-5. **Use health endpoints**: Quick way to verify services are running
+3. **Test new session flow**: Use "New Session" button and verify auto-detection
+4. **Check browser console**: Frontend errors, network requests, and "New session detected" logs
+5. **Monitor all terminals**: Backend, frontend, and proxy logs
+6. **Use health endpoints**: Quick way to verify services are running
+7. **Test auto-refresh stability**: Ensure features work during refresh cycles
 
 ---
 
