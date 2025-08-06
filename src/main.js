@@ -4,7 +4,7 @@ import { SessionVisibilityStore } from './storage.js';
 // Configuration for reverse proxy architecture
 const API_BASE_URL = import.meta.env.VITE_API_BASE_PATH || '/zviewer/api';
 const ZELLIJ_WEB_URL = import.meta.env.VITE_ZELLIJ_WEB_URL || ''; // Root path - zellij at domain root
-const SESSION_REFRESH_INTERVAL = parseInt(import.meta.env.VITE_SESSION_REFRESH_INTERVAL) || 30;
+const SESSION_REFRESH_INTERVAL = parseInt(import.meta.env.VITE_SESSION_REFRESH_INTERVAL) || 300;
 
 // Initialize visibility store
 const visibilityStore = new SessionVisibilityStore();
