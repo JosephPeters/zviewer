@@ -1,5 +1,7 @@
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import https from 'https';
+import fs from 'fs';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -19,8 +21,14 @@ const FRONTEND_PORT = process.env.FRONTEND_PORT || 5173;
 const FRONTEND_BASE_PATH = process.env.FRONTEND_BASE_PATH || '/zviewer';
 const API_BASE_PATH = process.env.API_BASE_PATH || '/zviewer/api';
 
+// HTTPS configuration
+const HTTPS_ENABLED = process.env.HTTPS_ENABLED === 'true';
+const HTTPS_KEY_PATH = process.env.HTTPS_KEY_PATH;
+const HTTPS_CERT_PATH = process.env.HTTPS_CERT_PATH;
+
 // Service URLs
-const ZELLIJ_TARGET = `http://${ZELLIJ_HOST}:${ZELLIJ_PORT}`;
+const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
+const ZELLIJ_TARGET = `${PROTOCOL}://${ZELLIJ_HOST}:${ZELLIJ_PORT}`;
 const BACKEND_TARGET = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 const FRONTEND_TARGET = `http://${FRONTEND_HOST}:${FRONTEND_PORT}${FRONTEND_BASE_PATH}`;
 
@@ -73,6 +81,7 @@ app.use('/', createProxyMiddleware({
   target: ZELLIJ_TARGET,
   changeOrigin: true,
   ws: true,
+  secure: false, // Allow self-signed certificates
   // Filter function to avoid conflicts with /zviewer
   filter: (pathname, req) => {
     const shouldProxy = !pathname.startsWith(FRONTEND_BASE_PATH) && !pathname.startsWith('/health');
@@ -89,20 +98,51 @@ app.use('/', createProxyMiddleware({
 }));
 
 // Start the proxy server
-app.listen(PORT, PROXY_HOST, () => {
-  console.log(`\n🎯 Reverse Proxy Server running on http://${PROXY_HOST}:${PORT}`);
+const startServer = () => {
+  if (HTTPS_ENABLED) {
+    if (!HTTPS_KEY_PATH || !HTTPS_CERT_PATH) {
+      console.error('❌ HTTPS enabled but certificate paths not provided');
+      console.error('   Set HTTPS_KEY_PATH and HTTPS_CERT_PATH environment variables');
+      process.exit(1);
+    }
+
+    try {
+      const privateKey = fs.readFileSync(HTTPS_KEY_PATH, 'utf8');
+      const certificate = fs.readFileSync(HTTPS_CERT_PATH, 'utf8');
+      const credentials = { key: privateKey, cert: certificate };
+
+      const httpsServer = https.createServer(credentials, app);
+      httpsServer.listen(PORT, PROXY_HOST, () => {
+        console.log(`\n🎯 Reverse Proxy Server running on ${PROTOCOL}://${PROXY_HOST}:${PORT}`);
+        logServerInfo();
+      });
+    } catch (error) {
+      console.error('❌ Failed to start HTTPS server:', error.message);
+      process.exit(1);
+    }
+  } else {
+    app.listen(PORT, PROXY_HOST, () => {
+      console.log(`\n🎯 Reverse Proxy Server running on ${PROTOCOL}://${PROXY_HOST}:${PORT}`);
+      logServerInfo();
+    });
+  }
+};
+
+const logServerInfo = () => {
   console.log('\n📋 Service Routes:');
-  console.log(`   🖥️  Zellij Web Client:     http://${PROXY_HOST}:${PORT}/`);
-  console.log(`   📱 Session Manager UI:    http://${PROXY_HOST}:${PORT}${FRONTEND_BASE_PATH}/`);
-  console.log(`   🔌 Backend API:           http://${PROXY_HOST}:${PORT}${API_BASE_PATH}/`);
-  console.log(`   ❤️  Health Check:         http://${PROXY_HOST}:${PORT}/health`);
+  console.log(`   🖥️  Zellij Web Client:     ${PROTOCOL}://${PROXY_HOST}:${PORT}/`);
+  console.log(`   📱 Session Manager UI:    ${PROTOCOL}://${PROXY_HOST}:${PORT}${FRONTEND_BASE_PATH}/`);
+  console.log(`   🔌 Backend API:           ${PROTOCOL}://${PROXY_HOST}:${PORT}${API_BASE_PATH}/`);
+  console.log(`   ❤️  Health Check:         ${PROTOCOL}://${PROXY_HOST}:${PORT}/health`);
   console.log(`\n🚀 Ready to tunnel port ${PORT}!`);
   console.log('\n💡 Usage:');
   console.log(`   1. Start zellij web server: zellij web --port ${ZELLIJ_PORT}`);
   console.log('   2. Start backend API: npm run server');
   console.log('   3. Start frontend: npm run dev');
   console.log(`   4. Tunnel this proxy: cloudflare tunnel --url ${PROXY_HOST}:${PORT}`);
-});
+};
+
+startServer();
 
 // Graceful shutdown
 process.on('SIGINT', () => {
