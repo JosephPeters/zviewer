@@ -1,8 +1,43 @@
-# Zellij Session Viewer (ZViewer)
+# Zellij Multi-Session Viewer (ZViewer)
 
-A comprehensive web-based session management interface for zellij terminal multiplexer. This application provides a modern, intuitive interface to view, navigate, and manage your zellij sessions with embedded terminal access.
+A comprehensive web-based session management interface for zellij terminal multiplexer. This application provides a modern, intuitive interface to view, navigate, and manage your zellij sessions with embedded terminal access. Perfect for Claude Code, Gemini Cli, OpenCode and more. 
 
-**✅ PRODUCTION READY**: Fully working reverse proxy architecture with same-origin authentication and embedded terminal sessions.
+![ZViewer Screenshot](public/zviewer.png)
+
+**✅ Straight to the point**: 
+
+Clone it first
+
+then
+```bash
+   npm install
+   ```
+then create zellij web token
+   ```bash
+   zellij web --create-token
+   ```
+
+then start zellij web
+```bash
+   zellij web --port 8083
+   ```
+then start all dev servers
+ ```bash
+   npm run dev-proxy
+   ```
+Navigate to `http://localhost:4000/zviewer/`
+
+### Important Note:
+ Safari and other browsers require HTTPS for auth. Cloudflare Quicktunnels are the fastest way to get up and running:
+Very easy to setup 
+https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
+
+after installing cloudflared then
+```bash
+   cloudflared tunnel --url http://localhost:8080
+   ```
+
+
 
 ## 🚀 Features
 

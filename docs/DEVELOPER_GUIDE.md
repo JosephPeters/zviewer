@@ -9,7 +9,8 @@ The Zellij Session Viewer is a web-based interface for managing and viewing zell
 2. **Displays session management UI** with sidebar navigation and status indicators
 3. **Embeds zellij web client** in iframes for direct terminal access
 4. **Creates new sessions** through embedded zellij interface with auto-detection
-5. **Provides same-origin authentication** through reverse proxy architecture
+5. **Manages session visibility** with manual hide/unhide and auto-hide for exited sessions
+6. **Provides same-origin authentication** through reverse proxy architecture
 
 ## 🏗️ **Architecture Deep Dive**
 
@@ -42,8 +43,9 @@ The Zellij Session Viewer is a web-based interface for managing and viewing zell
 zview/
 ├── proxy-server.js          # 🔥 Reverse proxy - routes all traffic
 ├── server.js               # 🔌 Backend API - zellij commands
-├── src/main.js             # 🖥️ Frontend logic - UI and state
-├── src/style.css           # 🎨 Responsive styling
+├── src/main.js             # 🖥️ Frontend logic - UI and state management
+├── src/style.css           # 🎨 Responsive styling with Lucide icons
+├── src/storage.js          # 💾 Session visibility persistence (localStorage)
 ├── vite.config.js          # ⚙️ Frontend build config
 └── package.json            # 📦 Dependencies and scripts
 ```
@@ -112,12 +114,19 @@ const sessions = stdout.trim().split('\n')
 **Key State**:
 ```javascript
 const appState = {
-  sessions: [],           // Session data from API for comparison
-  selectedSession: null,  // Currently viewed session (or {isNew: true} for creation)
-  loading: false,        // Loading state
-  sidebarCollapsed: false, // Mobile sidebar state
-  autoRefresh: true,     // Auto-refresh toggle
-  refreshInterval: null  // Refresh timer ID
+  sessions: [],              // Session data from API for comparison
+  selectedSession: null,     // Currently viewed session (or {isNew: true} for creation)
+  loading: false,           // Loading state
+  sidebarCollapsed: false,  // Mobile sidebar state
+  autoRefresh: true,        // Auto-refresh toggle
+  refreshInterval: null,    // Refresh timer ID
+  
+  // Session visibility state
+  hiddenSessions: new Set(),    // Set of manually hidden session names
+  autoHideExited: true,         // Auto-hide exited sessions
+  showHiddenSessions: false,    // Toggle to show/hide hidden sessions
+  visibleSessions: [],          // Computed visible sessions for display
+  hiddenSessionsCount: 0        // Count of hidden sessions
 };
 ```
 
@@ -128,6 +137,88 @@ const appState = {
 - `detectNewSession()` - Compare session lists to find newly created sessions
 - `renderSessions()` - Update UI with session data
 - `setupEventListeners()` - Keyboard shortcuts and clicks
+- `computeVisibleSessions()` - Filter sessions based on visibility rules
+- `hideSession()/unhideSession()` - Manual session visibility management
+- `autoHideExitedSessions()` - Auto-hide sessions that exit
+- `icon()` - Render Lucide SVG icons as HTML strings
+
+### **4. Session Visibility Management (src/storage.js)**
+**Purpose**: Persistent storage for session visibility preferences using localStorage
+
+**Key Features**:
+- **Manual Hide/Unhide**: Users can individually hide sessions with eye icon buttons
+- **Auto-Hide Exited Sessions**: Automatically hide sessions when they change from active to exited status
+- **Show Hidden Toggle**: Button in sidebar header to temporarily show all hidden sessions
+- **Persistent Settings**: All visibility preferences persist across browser sessions
+
+**Storage Architecture**:
+```javascript
+// localStorage keys
+HIDDEN_SESSIONS_KEY = 'zview_hidden_sessions'      // Array of hidden session names
+AUTO_HIDE_EXITED_KEY = 'zview_auto_hide_exited'    // Boolean for auto-hide setting
+SHOW_HIDDEN_KEY = 'zview_show_hidden'              // Boolean for show hidden toggle
+
+// SessionVisibilityStore class methods
+hideSession(sessionName)     // Add session to hidden list
+unhideSession(sessionName)   // Remove session from hidden list
+getHiddenSessions()          // Get array of hidden session names
+setAutoHideExited(enabled)   // Toggle auto-hide for exited sessions
+getShowHidden()              // Get current show hidden state
+```
+
+**UI Components**:
+- **Session Item Controls**: Eye/EyeOff icons appear on hover for manual hide/unhide
+- **Header Controls**: 
+  - Eye icon with count shows hidden sessions count
+  - Settings icon toggles auto-hide for exited sessions
+  - Refresh icon refreshes session list
+- **Hidden Session Indicator**: Sessions show "Hidden (manual/auto)" status when displayed
+- **Session Grouping**: Hidden sessions appear in separate section when shown
+
+**Visibility Logic**:
+```javascript
+// Session filtering logic
+sessions.forEach(session => {
+  const isManuallyHidden = hiddenSessions.has(session.name);
+  const isAutoHidden = autoHideExited && session.status !== 'active';
+  const shouldHide = isManuallyHidden || isAutoHidden;
+  
+  if (shouldHide) {
+    hidden.push({ ...session, hiddenReason: isManuallyHidden ? 'manual' : 'auto' });
+  } else {
+    visible.push(session);
+  }
+});
+```
+
+### **5. Icon System (Lucide Integration)**
+**Purpose**: Professional SVG icons throughout the interface
+
+**Implementation**:
+```javascript
+// Icon helper function
+function icon(name, size = 16, className = '') {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" 
+          fill="none" stroke="currentColor" stroke-width="2" 
+          stroke-linecap="round" stroke-linejoin="round" 
+          class="lucide lucide-${name} ${className}">
+    ${iconPaths[name]}
+  </svg>`;
+}
+```
+
+**Icon Usage**:
+- **Visibility**: `eye` (show), `eyeOff` (hide) 
+- **Status**: `play` (active sessions), `pause` (exited sessions)
+- **Controls**: `refreshCw` (refresh), `settings` (auto-hide), `menu` (sidebar toggle)
+- **Actions**: `plus` (new session), `monitor` (welcome screen)
+- **Indicators**: `circle` (auto-refresh status)
+
+**Benefits**:
+- Consistent visual design across all UI elements
+- Scalable vector graphics for sharp display at any size
+- Color theming support (inherits CSS colors)
+- Accessibility improvements over emoji/Unicode symbols
 
 ## ⚙️ **Environment Variables Configuration**
 
@@ -359,6 +450,17 @@ npm run start:all  # Uses environment variables automatically
 - [ ] **New session creation works** (button and Ctrl+N)
 - [ ] **New session interface stays stable during auto-refresh**
 - [ ] **Auto-detection switches to newly created sessions**
+- [ ] **Session visibility features work**:
+  - [ ] Manual hide/unhide with eye icons
+  - [ ] Auto-hide toggle in header (settings icon)
+  - [ ] Show hidden sessions toggle (eye icon with count)
+  - [ ] Hidden sessions display correctly when shown
+  - [ ] Visibility settings persist across browser refresh
+- [ ] **Icon display works correctly**:
+  - [ ] All Lucide icons render properly
+  - [ ] Session status icons (play/pause) show correct colors
+  - [ ] Button icons align properly with text
+  - [ ] Icons scale correctly at different sizes
 - [ ] Authentication persists in embedded sessions
 - [ ] Keyboard shortcuts work (arrows, enter, escape, Ctrl+N)
 - [ ] Auto-refresh updates session list (configurable interval)
@@ -454,9 +556,11 @@ if (appState.selectedSession?.isSpecialState) {
 ### **Immediate Opportunities**
 1. ~~**Environment Variables**: Implement the plan in `ENVIRONMENT_VARIABLES_PLAN.md`~~ ✅ **COMPLETED**
 2. ~~**Session Creation**: Add UI for creating new sessions~~ ✅ **COMPLETED**
-3. **Session Management**: Delete/rename sessions from UI
-4. **Enhanced New Session UX**: Session templates, naming validation, creation feedback
-5. **Error Handling**: Better error states and recovery
+3. ~~**Session Visibility Management**: Hide/unhide sessions with auto-hide for exited sessions~~ ✅ **COMPLETED**
+4. ~~**Professional Icon System**: Replace emoji/Unicode with Lucide SVG icons~~ ✅ **COMPLETED**
+5. **Session Management**: Delete/rename sessions from UI
+6. **Enhanced New Session UX**: Session templates, naming validation, creation feedback
+7. **Error Handling**: Better error states and recovery
 
 ### **Advanced Features**
 1. **Real-time Updates**: WebSocket connection for live session changes
@@ -488,10 +592,12 @@ if (appState.selectedSession?.isSpecialState) {
 - **express**: Backend web server
 - **cors**: Cross-origin resource sharing
 - **http-proxy-middleware**: Reverse proxy functionality
+- **dotenv**: Environment variables loading
 
 ### **Development Dependencies**
 - **vite**: Frontend build tool and dev server
 - **concurrently**: Run multiple npm scripts simultaneously
+- **lucide-react**: Professional SVG icon library (for icon paths)
 
 ### **External Dependencies**
 - **zellij**: Terminal multiplexer (must be installed)

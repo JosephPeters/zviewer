@@ -1,9 +1,34 @@
 import './style.css'
+import { SessionVisibilityStore } from './storage.js';
 
 // Configuration for reverse proxy architecture
 const API_BASE_URL = import.meta.env.VITE_API_BASE_PATH || '/zviewer/api';
 const ZELLIJ_WEB_URL = import.meta.env.VITE_ZELLIJ_WEB_URL || ''; // Root path - zellij at domain root
 const SESSION_REFRESH_INTERVAL = parseInt(import.meta.env.VITE_SESSION_REFRESH_INTERVAL) || 30;
+
+// Initialize visibility store
+const visibilityStore = new SessionVisibilityStore();
+
+// Helper function to create Lucide SVG icons
+function icon(name, size = 16, className = '') {
+  const paths = {
+    eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>',
+    refreshCw: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    rotateCcw: '<path d="M3 12a9 9 0 1 0 3-7.23L6 5"/><path d="M6 5H3v3"/>',
+    menu: '<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>',
+    plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    circle: '<circle cx="12" cy="12" r="10"/>',
+    pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+    play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+    monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
+    settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'
+  };
+  
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-${name} ${className}">
+    ${paths[name] || ''}
+  </svg>`;
+}
 
 // Application state
 let appState = {
@@ -13,7 +38,14 @@ let appState = {
   sidebarCollapsed: false,
   error: null,
   autoRefresh: true,
-  refreshInterval: null
+  refreshInterval: null,
+  
+  // Session visibility state
+  hiddenSessions: new Set(visibilityStore.getHiddenSessions()),
+  autoHideExited: visibilityStore.getAutoHideExited(),
+  showHiddenSessions: visibilityStore.getShowHidden(),
+  visibleSessions: [],
+  hiddenSessionsCount: 0
 };
 
 // Fetch zellij sessions from the backend
@@ -28,6 +60,181 @@ async function fetchSessions() {
   }
 }
 
+// Compute which sessions should be visible based on visibility rules
+function computeVisibleSessions() {
+  const { sessions, hiddenSessions, autoHideExited, showHiddenSessions } = appState;
+  
+  let visible = [];
+  let hidden = [];
+  
+  sessions.forEach(session => {
+    const isManuallyHidden = hiddenSessions.has(session.name);
+    const isAutoHidden = autoHideExited && session.status !== 'active';
+    const shouldHide = isManuallyHidden || isAutoHidden;
+    
+    if (shouldHide) {
+      hidden.push({ ...session, hiddenReason: isManuallyHidden ? 'manual' : 'auto' });
+    } else {
+      visible.push(session);
+    }
+  });
+  
+  // Add hidden sessions if toggled to show
+  if (showHiddenSessions) {
+    visible = [...visible, ...hidden.map(s => ({ ...s, isHidden: true }))];
+  }
+  
+  appState.visibleSessions = visible;
+  appState.hiddenSessionsCount = hidden.length;
+}
+
+// Session visibility management functions
+function hideSession(sessionName) {
+  visibilityStore.hideSession(sessionName);
+  appState.hiddenSessions.add(sessionName);
+  
+  // If hiding the selected session, deselect it
+  if (appState.selectedSession?.name === sessionName) {
+    appState.selectedSession = null;
+  }
+  
+  refreshSessionsDisplay();
+}
+
+function unhideSession(sessionName) {
+  visibilityStore.unhideSession(sessionName);
+  appState.hiddenSessions.delete(sessionName);
+  refreshSessionsDisplay();
+}
+
+function toggleHiddenSessionsVisibility() {
+  appState.showHiddenSessions = !appState.showHiddenSessions;
+  visibilityStore.setShowHidden(appState.showHiddenSessions);
+  refreshSessionsDisplay();
+}
+
+function toggleAutoHideExited() {
+  appState.autoHideExited = !appState.autoHideExited;
+  visibilityStore.setAutoHideExited(appState.autoHideExited);
+  refreshSessionsDisplay();
+}
+
+function refreshSessionsDisplay() {
+  computeVisibleSessions();
+  renderSidebar({ 
+    success: true, 
+    sessions: appState.sessions, 
+    count: appState.sessions.length 
+  });
+  renderMainContent();
+}
+
+// Render individual session item
+function renderSessionItem(session) {
+  const isHidden = session.isHidden || false;
+  const isSelected = appState.selectedSession?.name === session.name;
+  const statusClass = session.status !== 'active' ? 'session-exited' : '';
+  const selectedClass = isSelected ? 'selected' : '';
+  const hiddenClass = isHidden ? 'hidden' : '';
+  
+  const statusIcon = session.status === 'active' ? 
+    icon('play', 12, 'status-active') : 
+    icon('pause', 12, 'status-inactive');
+    
+  return `
+    <div class="session-item ${statusClass} ${selectedClass} ${hiddenClass}" data-session="${session.name}">
+      <div class="session-status-icon">
+        ${statusIcon}
+      </div>
+      <div class="session-content">
+        <div class="session-name">${session.name}</div>
+        <div class="session-time">${session.createdAgo} ago</div>
+        ${session.status !== 'active' ? `<div class="session-status">${session.status}</div>` : ''}
+        ${isHidden ? `<div class="hidden-indicator">Hidden (${session.hiddenReason})</div>` : ''}
+      </div>
+      <div class="session-controls">
+        <button class="toggle-visibility-btn" 
+                data-session="${session.name}" 
+                data-action="${isHidden ? 'show' : 'hide'}"
+                title="${isHidden ? 'Show session' : 'Hide session'}">
+          ${isHidden ? icon('eye', 16) : icon('eyeOff', 16)}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// Render sessions list with grouping
+function renderSessionsList() {
+  const { visibleSessions, showHiddenSessions } = appState;
+  
+  if (visibleSessions.length === 0) {
+    return '<div class="no-sessions"><p>No sessions to display</p></div>';
+  }
+  
+  // Group sessions by visibility
+  const activeVisible = visibleSessions.filter(s => !s.isHidden);
+  const hiddenVisible = visibleSessions.filter(s => s.isHidden);
+  
+  let html = '';
+  
+  // Render visible sessions
+  if (activeVisible.length > 0) {
+    html += `
+      <div class="visible-sessions-section">
+        ${activeVisible.map(renderSessionItem).join('')}
+      </div>
+    `;
+  }
+  
+  // Render hidden sessions section if shown
+  if (showHiddenSessions && hiddenVisible.length > 0) {
+    html += `
+      <div class="hidden-sessions-section">
+        <div class="hidden-sessions-header">
+          Hidden Sessions (${hiddenVisible.length})
+        </div>
+        ${hiddenVisible.map(renderSessionItem).join('')}
+      </div>
+    `;
+  }
+  
+  return `<div class="sessions-list">${html}</div>`;
+}
+
+// Render sidebar header with visibility controls
+function renderSidebarHeader(sessionsData) {
+  const totalCount = sessionsData.count;
+  const visibleCount = appState.visibleSessions.filter(s => !s.isHidden).length;
+  const hiddenCount = appState.hiddenSessionsCount;
+  
+  const countText = hiddenCount > 0 
+    ? `${visibleCount}`
+    : `${totalCount}`;
+    
+  return `
+    <div class="sidebar-header">
+      <h2>Sessions (${countText})</h2>
+      <div class="header-controls">
+        ${hiddenCount > 0 ? `
+          <button id="toggle-hidden-btn" 
+                  class="icon-btn ${appState.showHiddenSessions ? 'active' : ''}" 
+                  title="Show/Hide hidden sessions">
+            ${icon('eye', 14)} ${hiddenCount}
+          </button>
+        ` : ''}
+        <button id="auto-hide-toggle" 
+                class="icon-btn ${appState.autoHideExited ? 'active' : ''}" 
+                title="Auto-hide exited sessions">
+          ${icon('settings', 14)}
+        </button>
+        <button id="refresh-btn" class="icon-btn" title="Refresh (Ctrl+R)">${icon('refreshCw', 14)}</button>
+        <div class="auto-refresh-indicator ${appState.autoRefresh ? 'active' : ''}" title="Auto-refresh every 30s"></div>
+      </div>
+    </div>
+  `;
+}
+
 // Render sidebar sessions list
 function renderSidebar(sessionsData) {
   const sidebar = document.querySelector('#sidebar');
@@ -36,7 +243,7 @@ function renderSidebar(sessionsData) {
     sidebar.innerHTML = `
       <div class="sidebar-header">
         <h2>Sessions</h2>
-        <button id="refresh-btn" class="icon-btn" title="Refresh">↻</button>
+        <button id="refresh-btn" class="icon-btn" title="Refresh">${icon('refreshCw', 14)}</button>
       </div>
       <div class="sidebar-content">
         <div class="error">
@@ -52,7 +259,7 @@ function renderSidebar(sessionsData) {
     sidebar.innerHTML = `
       <div class="sidebar-header">
         <h2>Sessions</h2>
-        <button id="refresh-btn" class="icon-btn" title="Refresh">↻</button>
+        <button id="refresh-btn" class="icon-btn" title="Refresh">${icon('refreshCw', 14)}</button>
       </div>
       <div class="sidebar-content">
         <div class="no-sessions">
@@ -64,39 +271,17 @@ function renderSidebar(sessionsData) {
     return;
   }
 
-  // Update app state
+  // Update app state and compute visibility
   appState.sessions = sessionsData.sessions;
-
-  const sessionsList = sessionsData.sessions.map(session => {
-    const isExited = session.status !== 'active';
-    const isSelected = appState.selectedSession?.name === session.name;
-    const statusClass = isExited ? 'session-exited' : '';
-    const selectedClass = isSelected ? 'selected' : '';
-
-    return `
-      <div class="session-item ${statusClass} ${selectedClass}" data-session="${session.name}">
-        <div class="session-name">${session.name}</div>
-        <div class="session-time">${session.createdAgo} ago</div>
-        ${isExited ? `<div class="session-status">${session.status}</div>` : ''}
-      </div>
-    `;
-  }).join('');
+  computeVisibleSessions();
 
   sidebar.innerHTML = `
-    <div class="sidebar-header">
-      <h2>Sessions (${sessionsData.count})</h2>
-      <div class="header-controls">
-        <button id="refresh-btn" class="icon-btn" title="Refresh (Ctrl+R)">↻</button>
-        <div class="auto-refresh-indicator ${appState.autoRefresh ? 'active' : ''}" title="Auto-refresh every 30s">●</div>
-      </div>
-    </div>
+    ${renderSidebarHeader(sessionsData)}
     <div class="sidebar-content">
-      <div class="sessions-list">
-        ${sessionsList}
-      </div>
+      ${renderSessionsList()}
     </div>
     <div class="sidebar-footer">
-      <button id="new-session-btn" class="btn-secondary" title="Create new session">+ New Session</button>
+      <button id="new-session-btn" class="btn-secondary" title="Create new session">${icon('plus', 16)} New Session</button>
       <div class="keyboard-hints">
         <small>↑↓ Navigate • ESC Clear • Ctrl+R Refresh • Ctrl+N New</small>
       </div>
@@ -111,9 +296,9 @@ function renderMainContent() {
   if (!appState.selectedSession) {
     mainContent.innerHTML = `
       <div class="welcome-screen">
+        <div class="welcome-icon">${icon('monitor', 64)}</div>
         <h2>Welcome to Zellij Session Manager</h2>
         <p>Select a session from the sidebar to view its terminal interface.</p>
-        <div class="welcome-icon">🖥️</div>
       </div>
     `;
     return;
@@ -205,6 +390,27 @@ function selectSession(sessionName) {
   }, 500);
 }
 
+// Auto-hide newly exited sessions if auto-hide is enabled
+function autoHideExitedSessions(previousSessions, currentSessions) {
+  if (!appState.autoHideExited) return;
+
+  currentSessions.forEach(currentSession => {
+    // Check if this session was previously active but is now exited
+    const previousSession = previousSessions.find(p => p.name === currentSession.name);
+    
+    if (previousSession && 
+        previousSession.status === 'active' && 
+        currentSession.status !== 'active' &&
+        !appState.hiddenSessions.has(currentSession.name)) {
+      
+      // Auto-hide this newly exited session
+      console.log(`Auto-hiding exited session: ${currentSession.name}`);
+      visibilityStore.hideSession(currentSession.name);
+      appState.hiddenSessions.add(currentSession.name);
+    }
+  });
+}
+
 // Load and display sessions
 async function loadSessions() {
   const refreshButton = document.querySelector('#refresh-btn');
@@ -213,7 +419,7 @@ async function loadSessions() {
     refreshButton.disabled = true;
   }
 
-  // Store previous sessions for new session detection
+  // Store previous sessions for new session detection and auto-hide logic
   const previousSessions = [...appState.sessions];
 
   const sessionsData = await fetchSessions();
@@ -221,6 +427,9 @@ async function loadSessions() {
   // Update app state with new sessions
   if (sessionsData.success) {
     appState.sessions = sessionsData.sessions;
+    
+    // Auto-hide exited sessions if enabled
+    autoHideExitedSessions(previousSessions, sessionsData.sessions);
   }
 
   renderSidebar(sessionsData);
@@ -244,6 +453,12 @@ async function loadSessions() {
       if (!stillExists) {
         appState.selectedSession = null;
         renderMainContent();
+      } else {
+        // Check if selected session was auto-hidden
+        if (appState.hiddenSessions.has(appState.selectedSession.name)) {
+          appState.selectedSession = null;
+          renderMainContent();
+        }
       }
     }
   }
@@ -259,7 +474,7 @@ document.querySelector('#app').innerHTML = `
     <header class="app-header">
       <h1>Zellij Session Manager</h1>
       <div class="header-controls">
-        <button id="sidebar-toggle" class="icon-btn" title="Toggle Sidebar">☰</button>
+        <button id="sidebar-toggle" class="icon-btn" title="Toggle Sidebar">${icon('menu', 18)}</button>
       </div>
     </header>
 
@@ -275,6 +490,21 @@ document.querySelector('#app').innerHTML = `
 
 // Event delegation for dynamic content
 document.addEventListener('click', (e) => {
+  // Session visibility toggle - handle before session selection
+  if (e.target.closest('.toggle-visibility-btn')) {
+    e.stopPropagation(); // Prevent session selection
+    const btn = e.target.closest('.toggle-visibility-btn');
+    const sessionName = btn.dataset.session;
+    const action = btn.dataset.action;
+    
+    if (action === 'hide') {
+      hideSession(sessionName);
+    } else {
+      unhideSession(sessionName);
+    }
+    return;
+  }
+
   // Session selection
   if (e.target.closest('.session-item')) {
     const sessionItem = e.target.closest('.session-item');
@@ -282,6 +512,18 @@ document.addEventListener('click', (e) => {
     if (sessionName) {
       selectSession(sessionName);
     }
+  }
+
+  // Toggle hidden sessions visibility
+  if (e.target.id === 'toggle-hidden-btn') {
+    toggleHiddenSessionsVisibility();
+    return;
+  }
+
+  // Auto-hide toggle
+  if (e.target.id === 'auto-hide-toggle') {
+    toggleAutoHideExited();
+    return;
   }
 
   // Refresh button
@@ -298,11 +540,6 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'sidebar-toggle') {
     appState.sidebarCollapsed = !appState.sidebarCollapsed;
     document.querySelector('#sidebar').classList.toggle('collapsed', appState.sidebarCollapsed);
-  }
-
-  // New session button (placeholder for future)
-  if (e.target.id === 'new-session-btn') {
-    console.log('New session functionality coming soon!');
   }
 });
 

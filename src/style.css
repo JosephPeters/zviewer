@@ -225,6 +225,9 @@ h1 {
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .session-item:hover {
@@ -246,24 +249,22 @@ h1 {
   border-color: #777;
 }
 
-.session-item::before {
-  content: '';
-  position: absolute;
-  left: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #4ade80;
+.session-status-icon {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 0.1rem;
 }
 
-.session-item.session-exited::before {
-  background-color: #f87171;
+.session-status-icon .status-active {
+  color: #4ade80;
 }
 
-.session-item.selected::before {
-  background-color: #646cff;
+.session-status-icon .status-inactive {
+  color: #f87171;
+}
+
+.session-item.selected .session-status-icon svg {
+  color: #646cff;
 }
 
 .session-name {
@@ -271,21 +272,18 @@ h1 {
   font-weight: 600;
   color: #fff;
   margin-bottom: 0.25rem;
-  margin-left: 1rem;
 }
 
 .session-time {
   color: #888;
   font-size: 0.8em;
   margin-bottom: 0.25rem;
-  margin-left: 1rem;
 }
 
 .session-status {
   color: #f87171;
   font-size: 0.75em;
   font-style: italic;
-  margin-left: 1rem;
 }
 
 /* Main Content Area Styles */
@@ -311,8 +309,12 @@ h1 {
 }
 
 .welcome-icon {
-  font-size: 4rem;
   opacity: 0.5;
+  margin-bottom: 2rem;
+}
+
+.welcome-icon svg {
+  stroke-width: 1.5;
 }
 
 .loading-screen p, .error-screen p {
@@ -579,5 +581,129 @@ button:disabled {
 
   .no-sessions code {
     background-color: #e0e0e0;
+  }
+}
+
+/* Lucide Icon Styles */
+.lucide {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.icon-btn .lucide {
+  vertical-align: -2px;
+}
+
+.btn-secondary .lucide {
+  margin-right: 0.5rem;
+  vertical-align: -2px;
+}
+
+/* Session Hiding/Visibility Styles */
+.session-content {
+  flex: 1;
+  min-width: 0; /* Allow text to truncate */
+}
+
+.session-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.session-item:hover .session-controls {
+  opacity: 1;
+}
+
+.toggle-visibility-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 3px;
+  font-size: 1rem;
+  color: #888;
+  transition: all 0.2s;
+}
+
+.toggle-visibility-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Hidden session styling */
+.session-item.hidden {
+  opacity: 0.6;
+  border-left: 3px solid #f59e0b;
+}
+
+.session-item.hidden .session-name {
+  opacity: 0.8;
+}
+
+.hidden-indicator {
+  font-size: 0.75em;
+  color: #f59e0b;
+  font-style: italic;
+  margin-left: 1rem;
+  margin-top: 0.25rem;
+}
+
+/* Hidden sessions section */
+.hidden-sessions-section {
+  border-top: 1px solid #333;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.hidden-sessions-header {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #888;
+  margin-bottom: 0.5rem;
+  padding-left: 1rem;
+}
+
+/* Enhanced header controls */
+.sidebar-header .header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-btn.active {
+  background-color: #646cff;
+  color: white;
+  border-color: #646cff;
+}
+
+.icon-btn.active:hover {
+  background-color: #535bf2;
+  border-color: #535bf2;
+}
+
+/* Light mode adjustments for session hiding */
+@media (prefers-color-scheme: light) {
+  .toggle-visibility-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #213547;
+  }
+
+  .session-item.hidden {
+    border-left-color: #f59e0b;
+  }
+
+  .hidden-indicator {
+    color: #d97706;
+  }
+
+  .hidden-sessions-section {
+    border-top-color: #e0e0e0;
+  }
+
+  .hidden-sessions-header {
+    color: #666;
   }
 }
